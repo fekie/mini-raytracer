@@ -1,5 +1,5 @@
-use cgmath::Vector2;
-use mini_raytracer::{Canvas, Sphere, Viewport};
+use cgmath::{Vector2, Vector3};
+use mini_raytracer::components::{Canvas, FrameCoords, Rgba, Sphere, Viewport};
 use pixels::{Error, Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
 use winit::event::{Event, VirtualKeyCode};
@@ -7,60 +7,51 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 
-const WIDTH: u32 = 800;
-const HEIGHT: u32 = 800;
+const WIDTH: i32 = 800;
+const HEIGHT: i32 = 800;
 
 struct World {
     canvas: Canvas,
     viewport: Viewport,
     spheres: Vec<Sphere>,
+    background_color: [u8; 4],
 }
 
 impl World {
-    pub fn new(width: u32, height: u32, spheres: Vec<Sphere>) -> Self {
+    pub fn new(width: f64, height: f64, spheres: Vec<Sphere>, background_color: [u8; 4]) -> Self {
         Self {
             canvas: Canvas::new(width, height),
-            viewport: Viewport::new(width, height),
+            viewport: Viewport::new(1.0, 1.0, 1.0),
             spheres,
+            background_color,
         }
     }
 
     fn draw(&self, frame: &mut [u8]) {
         // iterates through each pixel, we will need to do raytracing to find the color of each pixel
         for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
-            let x = (i % WIDTH as usize) as i16;
-            let y = (i / WIDTH as usize) as i16;
+            let x = (i % WIDTH as usize) as i32;
+            let y = (i / WIDTH as usize) as i32;
 
-            // convert the frame coords to canvas coords
-            let canvas_coords =
-                self.frame_coords_to_canvas_coords(Vector2::new(x as f64, y as f64));
+            let frame_coords = FrameCoords::new(Vector2::new(x, y));
 
             // convert the canvas coords to the viewport coords
-            let viewport_coords = self.viewport_coords_to_canvas_coords(canvas_coords);
+            let direction = frame_coords.to_viewport_coords(&self.canvas, &self.viewport);
 
-            // do the math here
-
-            let rgba = [0x48, 0xb2, 0xe8, 0xff];
+            let rgba_opt = mini_raytracer::trace_ray(
+                Vector3::new(0.0, 0.0, 0.0),
+                direction,
+                &self.spheres,
+                1.0,
+                f64::MAX,
+            );
+            let rgba = match rgba_opt {
+                Some(_rgba) => _rgba.to_u8_array(),
+                None => self.background_color,
+            };
 
             pixel.copy_from_slice(&rgba);
         }
-    }
-
-    pub fn canvas_coords_to_frame_coords(&self, coords: Vector2<f64>) -> Vector2<f64> {
-        unimplemented!()
-    }
-
-    /// Sets frame coords (coords with the origin in the top left), to canvas coords (coords with the origin in the center)
-    pub fn frame_coords_to_canvas_coords(&self, coords: Vector2<f64>) -> Vector2<f64> {
-        unimplemented!()
-    }
-
-    pub fn canvas_coords_to_viewport_coords(&self, coords: Vector2<f64>) -> Vector2<f64> {
-        unimplemented!()
-    }
-
-    pub fn viewport_coords_to_canvas_coords(&self, coords: Vector2<f64>) -> Vector2<f64> {
-        unimplemented!()
     }
 }
 
@@ -80,15 +71,34 @@ fn main() -> Result<(), Error> {
     let mut pixels = {
         let window_size = window.inner_size();
         let surface_texture = SurfaceTexture::new(window_size.width, window_size.height, &window);
-        Pixels::new(WIDTH, HEIGHT, surface_texture)?
+        Pixels::new(WIDTH as u32, HEIGHT as u32, surface_texture)?
     };
 
-    let spheres = vec![];
-    let mut world = World::new(WIDTH, HEIGHT, spheres);
+    let spheres = vec![
+        Sphere::new(
+            Vector3::new(0.0, -1.0, 3.0),
+            Rgba::new(255.0, 0.0, 0.0, 255.0),
+            1.0,
+        ),
+        Sphere::new(
+            Vector3::new(2.0, 0.0, 4.0),
+            Rgba::new(0.0, 0.0, 255.0, 255.0),
+            1.0,
+        ),
+        Sphere::new(
+            Vector3::new(-2.0, 0.0, 4.0),
+            Rgba::new(0.0, 255.0, 0.0, 255.0),
+            1.0,
+        ),
+    ];
+
+    let background_color = [0, 0, 0, 255];
+
+    let mut world = World::new(WIDTH.into(), HEIGHT.into(), spheres, background_color);
+    world.draw(pixels.get_frame());
 
     event_loop.run(move |event, _, control_flow| {
         if let Event::RedrawRequested(_) = event {
-            world.draw(pixels.get_frame());
             if pixels
                 .render()
                 .map_err(|e| panic!("pixels.render() failed: {}", e))
