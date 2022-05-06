@@ -1,5 +1,5 @@
 use cgmath::{Vector2, Vector3};
-use mini_raytracer::components::{Canvas, Rgba, Sphere, Viewport};
+use mini_raytracer::components::{Canvas, Light, Rgba, Sphere, Viewport};
 use pixels::{Error, Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
 use winit::event::{Event, VirtualKeyCode};
@@ -14,15 +14,23 @@ struct World {
     canvas: Canvas,
     viewport: Viewport,
     spheres: Vec<Sphere>,
+    lights: Vec<Light>,
     background_color: [u8; 4],
 }
 
 impl World {
-    pub fn new(width: f64, height: f64, spheres: Vec<Sphere>, background_color: [u8; 4]) -> Self {
+    pub fn new(
+        width: f64,
+        height: f64,
+        spheres: Vec<Sphere>,
+        lights: Vec<Light>,
+        background_color: [u8; 4],
+    ) -> Self {
         Self {
             canvas: Canvas::new(width, height),
             viewport: Viewport::new(1.0, 1.0, 1.0),
             spheres,
+            lights,
             background_color,
         }
     }
@@ -46,6 +54,7 @@ impl World {
                 Vector3::new(0.0, 0.0, 0.0),
                 direction,
                 &self.spheres,
+                &self.lights,
                 1.0,
                 f64::MAX,
             );
@@ -96,9 +105,21 @@ fn main() -> Result<(), Error> {
         ),
     ];
 
+    let lights = vec![
+        Light::Ambient(0.2),
+        Light::Point(0.6, Vector3::new(2.0, 1.0, 0.0)),
+        Light::Directional(0.2, Vector3::new(1.0, 4.0, 4.0)),
+    ];
+
     let background_color = [0, 0, 0, 255];
 
-    let mut world = World::new(WIDTH.into(), HEIGHT.into(), spheres, background_color);
+    let mut world = World::new(
+        WIDTH.into(),
+        HEIGHT.into(),
+        spheres,
+        lights,
+        background_color,
+    );
     world.draw(pixels.get_frame());
 
     event_loop.run(move |event, _, control_flow| {

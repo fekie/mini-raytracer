@@ -1,5 +1,5 @@
 use cgmath::{InnerSpace, Vector2, Vector3};
-use components::{Canvas, Rgba, Sphere, Viewport};
+use components::{Canvas, Light, Rgba, Sphere, Viewport};
 
 pub mod components;
 
@@ -9,6 +9,7 @@ pub fn trace_ray(
     origin: Vector3<f64>,
     direction: Vector3<f64>,
     spheres: &Vec<Sphere>,
+    lights: &Vec<Light>,
     t_min: f64,
     t_max: f64,
 ) -> Option<Rgba> {
@@ -27,8 +28,14 @@ pub fn trace_ray(
         }
     }
 
+    let surface_point = origin + (closest_t * direction);
+
     match closest_sphere {
-        Some(sphere) => Some(sphere.color),
+        Some(sphere) => Some(sphere.color.multiply(compute_lighting_intensity(
+            surface_point,
+            sphere.center,
+            lights,
+        ))),
         None => None,
     }
 }
@@ -63,11 +70,37 @@ pub fn intersect_ray_sphere(
 
 pub fn compute_lighting_intensity(
     surface_point: Vector3<f64>,
-    surface_normal: Vector3<f64>,
-    ambient_light_intensity: f64,
-    directional_lights: Vec<DirectionalLight>,
-    point_lights: Vec<PointLight>,
-) {
+    circle_center: Vector3<f64>,
+    lights: &Vec<Light>,
+) -> f64 {
+    let mut i = 0.0;
+
+    let surface_normal = (surface_point - circle_center).normalize();
+
+    for light in lights {
+        if let Light::Ambient(_i) = light {
+            i += _i;
+            continue;
+        };
+
+        let (intensity, direction) = match *light {
+            Light::Point(intensity, position) => (intensity, position - surface_point),
+            Light::Directional(intensity, direction) => (intensity, direction),
+            _ => unreachable!(),
+        };
+
+        let normal_dot_direction = surface_normal.dot(direction);
+        if normal_dot_direction > 0.0 {
+            i += intensity * normal_dot_direction
+                / (magnitude(surface_normal) * magnitude(direction))
+        }
+    }
+
+    i
+}
+
+pub fn magnitude(vec: Vector3<f64>) -> f64 {
+    f64::sqrt((vec.x * vec.x) + (vec.y * vec.y) + (vec.z * vec.z))
 }
 
 pub fn frame_to_canvas_coords(frame_coords: Vector2<f64>, canvas: &Canvas) -> Vector2<f64> {

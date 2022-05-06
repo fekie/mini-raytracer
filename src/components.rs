@@ -33,6 +33,11 @@ impl Rgba {
     pub fn to_u8_array(&self) -> [u8; 4] {
         [self.r as u8, self.g as u8, self.b as u8, self.a as u8]
     }
+
+    /// does not mutate rgba
+    pub fn multiply(&self, f: f64) -> Self {
+        Rgba::new(self.r * f, self.g * f, self.b * f, self.a)
+    }
 }
 
 pub struct Viewport {
@@ -60,4 +65,17 @@ impl Canvas {
     pub fn new(width: f64, height: f64) -> Self {
         Self { width, height }
     }
+}
+
+/// Contains all the possible lights:
+///
+/// Direction (contains direction value)
+///
+/// Point (contains position and intensity value)
+///
+/// Ambient (contains intensity value)
+pub enum Light {
+    Directional(f64, Vector3<f64>),
+    Point(f64, Vector3<f64>),
+    Ambient(f64),
 }
