@@ -1,5 +1,5 @@
 use cgmath::{Vector2, Vector3};
-use mini_raytracer::components::{Canvas, FrameCoords, Rgba, Sphere, Viewport};
+use mini_raytracer::components::{Canvas, Rgba, Sphere, Viewport};
 use pixels::{Error, Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
 use winit::event::{Event, VirtualKeyCode};
@@ -30,13 +30,17 @@ impl World {
     fn draw(&self, frame: &mut [u8]) {
         // iterates through each pixel, we will need to do raytracing to find the color of each pixel
         for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
-            let x = (i % WIDTH as usize) as i32;
-            let y = (i / WIDTH as usize) as i32;
+            let x = (i % WIDTH as usize) as f64;
+            let y = (i / WIDTH as usize) as f64;
 
-            let frame_coords = FrameCoords::new(Vector2::new(x, y));
+            let frame_coords = Vector2::new(x, y);
 
             // convert the canvas coords to the viewport coords
-            let direction = frame_coords.to_viewport_coords(&self.canvas, &self.viewport);
+            let direction = mini_raytracer::frame_to_viewport_coords(
+                frame_coords,
+                &self.canvas,
+                &self.viewport,
+            );
 
             let rgba_opt = mini_raytracer::trace_ray(
                 Vector3::new(0.0, 0.0, 0.0),

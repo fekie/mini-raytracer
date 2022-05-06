@@ -1,5 +1,5 @@
-use cgmath::{InnerSpace, Vector3};
-use components::{Rgba, Sphere};
+use cgmath::{InnerSpace, Vector2, Vector3};
+use components::{Canvas, Rgba, Sphere, Viewport};
 
 pub mod components;
 
@@ -59,4 +59,102 @@ pub fn intersect_ray_sphere(
     let t1 = (-b + discriminant.sqrt()) / (2.0 * a);
     let t2 = (-b - discriminant.sqrt()) / (2.0 * a);
     (t1, t2)
+}
+
+pub fn frame_to_canvas_coords(frame_coords: Vector2<f64>, canvas: &Canvas) -> Vector2<f64> {
+    let cx = frame_coords.x - (canvas.width as f64 / 2.0);
+    let cy = (canvas.height as f64 / 2.0) - frame_coords.y;
+    Vector2::new(cx, cy)
+}
+
+pub fn canvas_to_viewport_coords(
+    canvas_coords: Vector2<f64>,
+    canvas: &Canvas,
+    viewport: &Viewport,
+) -> Vector3<f64> {
+    let vx = canvas_coords.x * (viewport.width / canvas.width);
+    let vy = canvas_coords.y * (viewport.height / canvas.height);
+    Vector3::new(vx, vy, viewport.depth)
+}
+
+pub fn frame_to_viewport_coords(
+    frame_coords: Vector2<f64>,
+    canvas: &Canvas,
+    viewport: &Viewport,
+) -> Vector3<f64> {
+    let canvas_coords = frame_to_canvas_coords(frame_coords, canvas);
+    canvas_to_viewport_coords(canvas_coords, canvas, viewport)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::components::{Canvas, Viewport};
+    use crate::{canvas_to_viewport_coords, frame_to_canvas_coords, frame_to_viewport_coords};
+    use cgmath::{Vector2, Vector3};
+
+    #[test]
+    fn frame_to_canvas() {
+        let frame_coords = Vector2::new(50.0, 50.0);
+        let canvas = Canvas::new(300.0, 300.0);
+        let canvas_coords = frame_to_canvas_coords(frame_coords, &canvas);
+        assert_eq!(canvas_coords, Vector2::new(-100.0, 100.0));
+
+        let frame_coords = Vector2::new(150.0, 150.0);
+        let canvas = Canvas::new(300.0, 300.0);
+        let canvas_coords = frame_to_canvas_coords(frame_coords, &canvas);
+        assert_eq!(canvas_coords, Vector2::new(0.0, 0.0));
+
+        // 299 is the highest x and y value in frame coords with a width and height of 300 because the index starts at 0
+        let frame_coords = Vector2::new(299.0, 299.0);
+        let canvas = Canvas::new(300.0, 300.0);
+        let canvas_coords = frame_to_canvas_coords(frame_coords, &canvas);
+        assert_eq!(canvas_coords, Vector2::new(149.0, -149.0));
+
+        let frame_coords = Vector2::new(0.0, 299.0);
+        let canvas = Canvas::new(300.0, 300.0);
+        let canvas_coords = frame_to_canvas_coords(frame_coords, &canvas);
+        assert_eq!(canvas_coords, Vector2::new(-150.0, -149.0));
+
+        let frame_coords = Vector2::new(299.0, 0.0);
+        let canvas = Canvas::new(300.0, 300.0);
+        let canvas_coords = frame_to_canvas_coords(frame_coords, &canvas);
+        assert_eq!(canvas_coords, Vector2::new(149.0, 150.0));
+    }
+
+    #[test]
+    fn canvas_to_viewport() {
+        let canvas = Canvas::new(300.0, 300.0);
+        let viewport = Viewport::new(300.0, 300.0, 1.0);
+        let canvas_coords = Vector2::new(100.0, 100.0);
+        let viewport_coords = canvas_to_viewport_coords(canvas_coords, &canvas, &viewport);
+        assert_eq!(viewport_coords, Vector3::new(100.0, 100.0, 1.0));
+
+        // "squeezes" the viewport by a factor of 2
+        let canvas = Canvas::new(600.0, 600.0);
+        let viewport = Viewport::new(300.0, 300.0, 1.0);
+        let canvas_coords = Vector2::new(100.0, 100.0);
+        let viewport_coords = canvas_to_viewport_coords(canvas_coords, &canvas, &viewport);
+        assert_eq!(viewport_coords, Vector3::new(50.0, 50.0, 1.0));
+
+        let canvas = Canvas::new(100.0, 100.0);
+        let viewport = Viewport::new(1.0, 1.0, 1.0);
+        let canvas_coords = Vector2::new(40.0, 40.0);
+        let viewport_coords = canvas_to_viewport_coords(canvas_coords, &canvas, &viewport);
+        assert_eq!(viewport_coords, Vector3::new(0.4, 0.4, 1.0));
+
+        let canvas = Canvas::new(100.0, 100.0);
+        let viewport = Viewport::new(1.0, 1.0, 1.0);
+        let canvas_coords = Vector2::new(-40.0, -40.0);
+        let viewport_coords = canvas_to_viewport_coords(canvas_coords, &canvas, &viewport);
+        assert_eq!(viewport_coords, Vector3::new(-0.4, -0.4, 1.0));
+    }
+
+    #[test]
+    fn frame_to_viewport() {
+        let canvas = Canvas::new(100.0, 100.0);
+        let viewport = Viewport::new(1.0, 1.0, 1.0);
+        let frame_coords = Vector2::new(90.0, 10.0);
+        let viewport_coords = frame_to_viewport_coords(frame_coords, &canvas, &viewport);
+        assert_eq!(viewport_coords, Vector3::new(0.4, 0.4, 1.0));
+    }
 }
