@@ -61,6 +61,15 @@ pub fn intersect_ray_sphere(
     (t1, t2)
 }
 
+pub fn compute_lighting_intensity(
+    surface_point: Vector3<f64>,
+    surface_normal: Vector3<f64>,
+    ambient_light_intensity: f64,
+    directional_lights: Vec<DirectionalLight>,
+    point_lights: Vec<PointLight>,
+) {
+}
+
 pub fn frame_to_canvas_coords(frame_coords: Vector2<f64>, canvas: &Canvas) -> Vector2<f64> {
     let cx = frame_coords.x - (canvas.width as f64 / 2.0);
     let cy = (canvas.height as f64 / 2.0) - frame_coords.y;
