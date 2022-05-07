@@ -6,15 +6,23 @@ pub struct Sphere {
     pub color: Rgba,
     pub radius: f64,
     pub specular: f64,
+    pub reflective: f64,
 }
 
 impl Sphere {
-    pub fn new(center: Vector3<f64>, color: Rgba, radius: f64, specular: f64) -> Self {
+    pub fn new(
+        center: Vector3<f64>,
+        color: Rgba,
+        radius: f64,
+        specular: f64,
+        reflective: f64,
+    ) -> Self {
         Self {
             center,
             color,
             radius,
             specular,
+            reflective,
         }
     }
 }
@@ -39,6 +47,19 @@ impl Rgba {
     /// does not mutate rgba
     pub fn multiply(&self, f: f64) -> Self {
         Rgba::new(self.r * f, self.g * f, self.b * f, self.a)
+    }
+}
+
+impl std::ops::Add for Rgba {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self {
+            r: self.r + other.r,
+            g: self.g + other.g,
+            b: self.b + other.b,
+            a: self.a + other.a,
+        }
     }
 }
 

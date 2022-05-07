@@ -4,30 +4,60 @@ use components::{Canvas, Light, Rgba, Sphere, Viewport};
 pub mod components;
 
 /// Returns a color if the ray hits a sphere.
-/// Returns None if the ray does not hit
+/// Returns background_color if the ray does not hit
 pub fn trace_ray(
-    camera: Vector3<f64>,
+    origin: Vector3<f64>,
     direction: Vector3<f64>,
+    background_color: Rgba,
     spheres: &Vec<Sphere>,
     lights: &Vec<Light>,
     t_min: f64,
     t_max: f64,
-) -> Option<Rgba> {
+    recursion_depth: u32,
+) -> Rgba {
     let (closest_sphere, closest_t) =
-        closest_sphere_intersection(camera, direction, spheres, t_min, t_max);
+        closest_sphere_intersection(origin, direction, spheres, t_min, t_max);
 
-    let surface_point = camera + (closest_t * direction);
+    let surface_point = origin + (closest_t * direction);
 
-    // the closure will run if the closest sphere is not None
-    closest_sphere.map(|sphere| {
-        sphere.color.multiply(compute_lighting_intensity(
+    if closest_sphere.is_none() {
+        return background_color;
+    }
+
+    // this will always not panic because we already checked to see if it was None
+    let unwrapped_sphere = closest_sphere.unwrap();
+
+    let mut local_color = unwrapped_sphere.color.multiply(compute_lighting_intensity(
+        surface_point,
+        unwrapped_sphere,
+        spheres,
+        origin,
+        lights,
+    ));
+
+    // if we hit the recursion limit, or the object is not reflective, we can go ahead and return the color
+    let reflective = unwrapped_sphere.reflective;
+    if (recursion_depth == 0) || (reflective <= 0.0) {
+        local_color
+    } else {
+        let surface_normal = (surface_point - unwrapped_sphere.center).normalize();
+        // this reflection will point in the direction of where we need to look for intersections
+        let reflection = reflect_ray_over_normal(-direction, surface_normal);
+        let reflected_color = trace_ray(
             surface_point,
-            sphere,
+            reflection,
+            background_color,
             spheres,
-            camera,
             lights,
-        ))
-    })
+            0.00001,
+            f64::MAX,
+            recursion_depth - 1,
+        );
+
+        // we "mix" the reflected color into our local color
+        // a reflectiveness of 0.2 means that the new color includes 20% of the relected color
+        local_color.multiply(1.0 - reflective) + reflected_color.multiply(reflective)
+    }
 }
 
 /// Returns the sphere, and the value t, if an intersection was found.
@@ -148,6 +178,7 @@ pub fn compute_lighting_intensity(
         // let r = dn - dp;
 
         // compact version
+        // reflect_ray_over_normal would also work here, but we can reuse normal_dot_direction if we do it this way
         let r = (2.0 * surface_normal * normal_dot_direction) - direction;
 
         // v is the "view vector" that points from the surface point to the camera
@@ -158,6 +189,12 @@ pub fn compute_lighting_intensity(
     }
 
     i
+}
+
+/// Reflects a ray over a normal. The second value MUST be a normal as this uses an optimization of the vector projection
+/// algorithm that only works when the length of the value being projected on has a magnitude of 1.
+pub fn reflect_ray_over_normal(ray: Vector3<f64>, normal: Vector3<f64>) -> Vector3<f64> {
+    (2.0 * normal * normal.dot(ray)) - ray
 }
 
 pub fn frame_to_canvas_coords(frame_coords: Vector2<f64>, canvas: &Canvas) -> Vector2<f64> {

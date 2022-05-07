@@ -9,13 +9,14 @@ use winit_input_helper::WinitInputHelper;
 
 const WIDTH: i32 = 800;
 const HEIGHT: i32 = 800;
+const REFLECTION_PASSES: u32 = 3;
 
 struct World {
     canvas: Canvas,
     viewport: Viewport,
     spheres: Vec<Sphere>,
     lights: Vec<Light>,
-    background_color: [u8; 4],
+    background_color: Rgba,
 }
 
 impl World {
@@ -24,7 +25,7 @@ impl World {
         height: f64,
         spheres: Vec<Sphere>,
         lights: Vec<Light>,
-        background_color: [u8; 4],
+        background_color: Rgba,
     ) -> Self {
         Self {
             canvas: Canvas::new(width, height),
@@ -50,20 +51,18 @@ impl World {
                 &self.viewport,
             );
 
-            let rgba_opt = mini_raytracer::trace_ray(
+            let rgba = mini_raytracer::trace_ray(
                 Vector3::new(0.0, 0.0, 0.0),
                 direction,
+                self.background_color,
                 &self.spheres,
                 &self.lights,
                 1.0,
                 f64::MAX,
+                REFLECTION_PASSES,
             );
-            let rgba = match rgba_opt {
-                Some(_rgba) => _rgba.to_u8_array(),
-                None => self.background_color,
-            };
 
-            pixel.copy_from_slice(&rgba);
+            pixel.copy_from_slice(&rgba.to_u8_array());
         }
     }
 }
@@ -94,6 +93,8 @@ fn main() -> Result<(), Error> {
             1.0,
             // shiny
             500.0,
+            // 20% reflective
+            0.2,
         ),
         Sphere::new(
             Vector3::new(2.0, 0.0, 5.0),
@@ -101,6 +102,8 @@ fn main() -> Result<(), Error> {
             1.0,
             // shiny
             500.0,
+            // 30% reflective
+            0.3,
         ),
         Sphere::new(
             Vector3::new(-2.0, 0.0, 5.0),
@@ -108,6 +111,8 @@ fn main() -> Result<(), Error> {
             1.0,
             // somewhat shiny
             10.0,
+            //40% reflective
+            0.4,
         ),
         Sphere::new(
             Vector3::new(0.0, -5001.2, 0.0),
@@ -115,6 +120,8 @@ fn main() -> Result<(), Error> {
             5000.0,
             // very shiny
             1000.0,
+            // 50% reflective
+            0.5,
         ),
     ];
 
@@ -124,9 +131,10 @@ fn main() -> Result<(), Error> {
         Light::Directional(0.2, Vector3::new(1.0, 4.0, 4.0)),
     ];
 
-    let background_color = [0, 0, 0, 255];
+    let background_color = Rgba::new(0.0, 0.0, 0.0, 255.0);
+    //let background_color = [0, 0, 0, 255];
 
-    let mut world = World::new(
+    let world = World::new(
         WIDTH.into(),
         HEIGHT.into(),
         spheres,
