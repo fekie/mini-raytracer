@@ -1,5 +1,6 @@
-use cgmath::{Vector2, Vector3};
-use mini_raytracer::components::{Canvas, Light, Rgba, Sphere, Viewport};
+use cgmath::Vector3;
+use mini_raytracer::components::{Camera, Light, Rgba, Sphere};
+use mini_raytracer::World;
 use pixels::{Error, Pixels, SurfaceTexture};
 use std::io::{self, Write};
 use std::time::Instant;
@@ -12,62 +13,6 @@ use winit_input_helper::WinitInputHelper;
 const WIDTH: i32 = 800;
 const HEIGHT: i32 = 800;
 const REFLECTION_PASSES: u32 = 3;
-
-struct World {
-    canvas: Canvas,
-    viewport: Viewport,
-    spheres: Vec<Sphere>,
-    lights: Vec<Light>,
-    background_color: Rgba,
-}
-
-impl World {
-    pub fn new(
-        width: f64,
-        height: f64,
-        spheres: Vec<Sphere>,
-        lights: Vec<Light>,
-        background_color: Rgba,
-    ) -> Self {
-        Self {
-            canvas: Canvas::new(width, height),
-            viewport: Viewport::new(1.0, 1.0, 1.0),
-            spheres,
-            lights,
-            background_color,
-        }
-    }
-
-    fn draw(&self, frame: &mut [u8]) {
-        // iterates through each pixel, we will need to do raytracing to find the color of each pixel
-        for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
-            let x = (i % WIDTH as usize) as f64;
-            let y = (i / WIDTH as usize) as f64;
-
-            let frame_coords = Vector2::new(x, y);
-
-            // convert the canvas coords to the viewport coords
-            let direction = mini_raytracer::frame_to_viewport_coords(
-                frame_coords,
-                &self.canvas,
-                &self.viewport,
-            );
-
-            let rgba = mini_raytracer::trace_ray(
-                Vector3::new(0.0, 0.0, 0.0),
-                direction,
-                self.background_color,
-                &self.spheres,
-                &self.lights,
-                1.0,
-                f64::MAX,
-                REFLECTION_PASSES,
-            );
-
-            pixel.copy_from_slice(&rgba.to_u8_array());
-        }
-    }
-}
 
 fn main() -> Result<(), Error> {
     let event_loop = EventLoop::new();
@@ -134,11 +79,14 @@ fn main() -> Result<(), Error> {
     ];
 
     let background_color = Rgba::new(0.0, 0.0, 0.0, 255.0);
-    //let background_color = [0, 0, 0, 255];
+
+    let camera = Camera::new(Vector3::new(0.0, 0.0, 0.0));
 
     let world = World::new(
         WIDTH.into(),
         HEIGHT.into(),
+        REFLECTION_PASSES,
+        camera,
         spheres,
         lights,
         background_color,

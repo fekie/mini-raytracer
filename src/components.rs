@@ -28,6 +28,17 @@ impl Sphere {
 }
 
 #[derive(Debug, Clone, Copy)]
+pub struct Camera {
+    pub position: Vector3<f64>,
+}
+
+impl Camera {
+    pub fn new(position: Vector3<f64>) -> Self {
+        Self { position }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct Rgba {
     pub r: f64,
     pub g: f64,
