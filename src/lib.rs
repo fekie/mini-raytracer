@@ -1,4 +1,4 @@
-use cgmath::{InnerSpace, Vector2, Vector3};
+use cgmath::{num_traits::Pow, InnerSpace, Vector2, Vector3};
 use components::{Canvas, Light, Rgba, Sphere, Viewport};
 
 pub mod components;
@@ -6,13 +6,37 @@ pub mod components;
 /// Returns a color if the ray hits a sphere.
 /// Returns None if the ray does not hit
 pub fn trace_ray(
-    origin: Vector3<f64>,
+    camera: Vector3<f64>,
     direction: Vector3<f64>,
     spheres: &Vec<Sphere>,
     lights: &Vec<Light>,
     t_min: f64,
     t_max: f64,
 ) -> Option<Rgba> {
+    let (closest_sphere, closest_t) =
+        closest_sphere_intersection(camera, direction, spheres, t_min, t_max);
+
+    let surface_point = camera + (closest_t * direction);
+
+    closest_sphere.map(|sphere| {
+        sphere.color.multiply(compute_lighting_intensity(
+            surface_point,
+            sphere,
+            camera,
+            lights,
+        ))
+    })
+}
+
+/// Returns the sphere, and the value t, if an intersection was found.
+/// t will == f64::MAX if no intersection is found.
+pub fn closest_sphere_intersection(
+    origin: Vector3<f64>,
+    direction: Vector3<f64>,
+    spheres: &Vec<Sphere>,
+    t_min: f64,
+    t_max: f64,
+) -> (Option<Sphere>, f64) {
     let mut closest_t = f64::MAX;
     let mut closest_sphere = None;
 
@@ -20,24 +44,15 @@ pub fn trace_ray(
         let (t1, t2) = intersect_ray_sphere(origin, direction, *sphere);
         if (t1 >= t_min) && (t1 <= t_max) && (t1 < closest_t) {
             closest_t = t1;
-            closest_sphere = Some(sphere);
+            closest_sphere = Some(*sphere);
         }
         if (t2 >= t_min) && (t2 <= t_max) && (t2 < closest_t) {
             closest_t = t2;
-            closest_sphere = Some(sphere);
+            closest_sphere = Some(*sphere);
         }
     }
 
-    let surface_point = origin + (closest_t * direction);
-
-    match closest_sphere {
-        Some(sphere) => Some(sphere.color.multiply(compute_lighting_intensity(
-            surface_point,
-            sphere.center,
-            lights,
-        ))),
-        None => None,
-    }
+    (closest_sphere, closest_t)
 }
 
 /// Loops through all the spheres and finds any intersections between the ray and points on the spheres.
@@ -46,6 +61,9 @@ pub fn trace_ray(
 /// `P = O + t1(D)`
 ///
 /// ` P = O + t2(D)`
+///
+/// Origin will usually be the camera, but can also be a different value when calulating for any blocking spheres between two
+/// arbitrary points. It is not referring to the 3d space origin (0,0,0).
 pub fn intersect_ray_sphere(
     origin: Vector3<f64>,
     direction: Vector3<f64>,
@@ -68,14 +86,16 @@ pub fn intersect_ray_sphere(
     (t1, t2)
 }
 
+// Computes the lighting intensity using lighting diffusion and specular illumination
 pub fn compute_lighting_intensity(
     surface_point: Vector3<f64>,
-    circle_center: Vector3<f64>,
+    sphere: Sphere,
+    camera: Vector3<f64>,
     lights: &Vec<Light>,
 ) -> f64 {
     let mut i = 0.0;
 
-    let surface_normal = (surface_point - circle_center).normalize();
+    let surface_normal = (surface_point - sphere.center).normalize();
 
     for light in lights {
         if let Light::Ambient(_i) = light {
@@ -83,6 +103,7 @@ pub fn compute_lighting_intensity(
             continue;
         };
 
+        // direction is the vector starting from the surface point, and pointing to the light
         let (intensity, direction) = match *light {
             Light::Point(intensity, position) => (intensity, position - surface_point),
             Light::Directional(intensity, direction) => (intensity, direction),
@@ -90,17 +111,39 @@ pub fn compute_lighting_intensity(
         };
 
         let normal_dot_direction = surface_normal.dot(direction);
+
+        // if the direction is below 0 then that means we're lighting the back of the surface!
+
+        // we're done calculating diffuse illumination
         if normal_dot_direction > 0.0 {
-            i += intensity * normal_dot_direction
-                / (magnitude(surface_normal) * magnitude(direction))
-        }
+            i += intensity
+                * (normal_dot_direction / (surface_normal.magnitude() * direction.magnitude()));
+        };
+
+        //TODO: simplify this
+        // r is going to be the direction of the light (starting from the surface point) reflected over the normal of the surface
+        // we're going to break the direction into two components, dn and dp, where dn is parallel to the normal
+        // direction = dn + dp
+        // this means that r = dn - dp
+        // dn is the vector projection of the direction onto the surface normal.
+        // normally we would divide the dot product by |n|, but |n| = 1 so no division is neccessary
+
+        // broken down code example for calculating r
+        // let dn = surface_normal * (surface_normal.dot(direction));
+        // let dp = direction - dn;
+        // let r = dn - dp;
+
+        // compact version
+        let r = (2.0 * surface_normal * normal_dot_direction) - direction;
+
+        // v is the "view vector" that points from the surface point to the camera
+        let v = camera - surface_point;
+        let specular_multiplier = (r.dot(v) / (r.magnitude() * v.magnitude())).pow(sphere.specular);
+
+        i += intensity * (specular_multiplier);
     }
 
     i
-}
-
-pub fn magnitude(vec: Vector3<f64>) -> f64 {
-    f64::sqrt((vec.x * vec.x) + (vec.y * vec.y) + (vec.z * vec.z))
 }
 
 pub fn frame_to_canvas_coords(frame_coords: Vector2<f64>, canvas: &Canvas) -> Vector2<f64> {

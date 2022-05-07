@@ -5,14 +5,16 @@ pub struct Sphere {
     pub center: Vector3<f64>,
     pub color: Rgba,
     pub radius: f64,
+    pub specular: f64,
 }
 
 impl Sphere {
-    pub fn new(center: Vector3<f64>, color: Rgba, radius: f64) -> Self {
+    pub fn new(center: Vector3<f64>, color: Rgba, radius: f64, specular: f64) -> Self {
         Self {
             center,
             color,
             radius,
+            specular,
         }
     }
 }

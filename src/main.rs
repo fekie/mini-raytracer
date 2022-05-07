@@ -74,7 +74,7 @@ fn main() -> Result<(), Error> {
     let window = {
         let size = LogicalSize::new(WIDTH as f64, HEIGHT as f64);
         WindowBuilder::new()
-            .with_title("Basic Ray Collisions")
+            .with_title("mini-raytracer")
             .with_inner_size(size)
             .with_min_inner_size(size)
             .build(&event_loop)
@@ -89,19 +89,32 @@ fn main() -> Result<(), Error> {
 
     let spheres = vec![
         Sphere::new(
-            Vector3::new(0.0, -1.0, 3.0),
+            Vector3::new(0.0, -1.0, 4.0),
             Rgba::new(255.0, 0.0, 0.0, 255.0),
             1.0,
+            // shiny
+            500.0,
         ),
         Sphere::new(
-            Vector3::new(2.0, 0.0, 4.0),
+            Vector3::new(2.0, 0.0, 5.0),
             Rgba::new(0.0, 0.0, 255.0, 255.0),
             1.0,
+            // shiny
+            500.0,
         ),
         Sphere::new(
-            Vector3::new(-2.0, 0.0, 4.0),
+            Vector3::new(-2.0, 0.0, 5.0),
             Rgba::new(0.0, 255.0, 0.0, 255.0),
             1.0,
+            // somewhat shiny
+            10.0,
+        ),
+        Sphere::new(
+            Vector3::new(0.0, -5001.2, 0.0),
+            Rgba::new(100.0, 100.0, 100.0, 255.0),
+            5000.0,
+            // very shiny
+            1000.0,
         ),
     ];
 
