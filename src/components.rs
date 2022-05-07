@@ -73,7 +73,7 @@ impl Canvas {
 ///
 /// Direction (contains direction value)
 ///
-/// Point (contains position and intensity value)
+/// Point (contains position and default intensity value)
 ///
 /// Ambient (contains intensity value)
 pub enum Light {

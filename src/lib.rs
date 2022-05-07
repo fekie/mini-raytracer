@@ -18,10 +18,12 @@ pub fn trace_ray(
 
     let surface_point = camera + (closest_t * direction);
 
+    // the closure will run if the closest sphere is not None
     closest_sphere.map(|sphere| {
         sphere.color.multiply(compute_lighting_intensity(
             surface_point,
             sphere,
+            spheres,
             camera,
             lights,
         ))
@@ -90,6 +92,7 @@ pub fn intersect_ray_sphere(
 pub fn compute_lighting_intensity(
     surface_point: Vector3<f64>,
     sphere: Sphere,
+    all_spheres: &Vec<Sphere>,
     camera: Vector3<f64>,
     lights: &Vec<Light>,
 ) -> f64 {
@@ -104,23 +107,34 @@ pub fn compute_lighting_intensity(
         };
 
         // direction is the vector starting from the surface point, and pointing to the light
-        let (intensity, direction) = match *light {
-            Light::Point(intensity, position) => (intensity, position - surface_point),
-            Light::Directional(intensity, direction) => (intensity, direction),
+        // t_max is the scalar multiplier we will use when checking for shadows
+        // point lights have a scalar value of 1, because we dont want to look for shadows if a sphere is behind the light
+        // directional lights have a scalar value of f64::MAX
+        let (default_intensity, direction, t_max) = match *light {
+            Light::Point(intensity, position) => (intensity, position - surface_point, 1.0),
+            Light::Directional(intensity, direction) => (intensity, direction, f64::MAX),
             _ => unreachable!(),
         };
+
+        // shadow check
+        // we dont want t_min == 0 so that so that the sphere doesnt intersect itself
+        let (shadow_sphere, _shadow_t) =
+            closest_sphere_intersection(surface_point, direction, all_spheres, 0.0000001, t_max);
+
+        if shadow_sphere.is_some() {
+            //println!("meow");
+            continue;
+        }
 
         let normal_dot_direction = surface_normal.dot(direction);
 
         // if the direction is below 0 then that means we're lighting the back of the surface!
-
-        // we're done calculating diffuse illumination
         if normal_dot_direction > 0.0 {
-            i += intensity
+            // calculate and add diffuse illumination
+            i += default_intensity
                 * (normal_dot_direction / (surface_normal.magnitude() * direction.magnitude()));
         };
 
-        //TODO: simplify this
         // r is going to be the direction of the light (starting from the surface point) reflected over the normal of the surface
         // we're going to break the direction into two components, dn and dp, where dn is parallel to the normal
         // direction = dn + dp
@@ -140,7 +154,7 @@ pub fn compute_lighting_intensity(
         let v = camera - surface_point;
         let specular_multiplier = (r.dot(v) / (r.magnitude() * v.magnitude())).pow(sphere.specular);
 
-        i += intensity * (specular_multiplier);
+        i += default_intensity * (specular_multiplier);
     }
 
     i
