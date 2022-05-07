@@ -3,6 +3,7 @@ use components::{Canvas, Light, Rgba, Sphere, Viewport};
 
 pub mod components;
 
+#[allow(clippy::too_many_arguments)]
 /// Returns a color if the ray hits a sphere.
 /// Returns background_color if the ray does not hit
 pub fn trace_ray(
@@ -27,7 +28,7 @@ pub fn trace_ray(
     // this will always not panic because we already checked to see if it was None
     let unwrapped_sphere = closest_sphere.unwrap();
 
-    let mut local_color = unwrapped_sphere.color.multiply(compute_lighting_intensity(
+    let local_color = unwrapped_sphere.color.multiply(compute_lighting_intensity(
         surface_point,
         unwrapped_sphere,
         spheres,

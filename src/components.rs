@@ -1,4 +1,4 @@
-use cgmath::{InnerSpace, Vector2, Vector3};
+use cgmath::Vector3;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Sphere {

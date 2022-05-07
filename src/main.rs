@@ -1,6 +1,8 @@
 use cgmath::{Vector2, Vector3};
 use mini_raytracer::components::{Canvas, Light, Rgba, Sphere, Viewport};
 use pixels::{Error, Pixels, SurfaceTexture};
+use std::io::{self, Write};
+use std::time::Instant;
 use winit::dpi::LogicalSize;
 use winit::event::{Event, VirtualKeyCode};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -143,8 +145,19 @@ fn main() -> Result<(), Error> {
     );
     world.draw(pixels.get_frame());
 
+    let mut frames = 0;
+    let mut last_frame_update = Instant::now();
+
     event_loop.run(move |event, _, control_flow| {
         if let Event::RedrawRequested(_) = event {
+            frames += 1;
+            let elapsed = last_frame_update.elapsed().as_millis();
+            if elapsed >= 1000 {
+                last_frame_update = Instant::now();
+                print!("\rFps: {}", frames);
+                io::stdout().flush().unwrap();
+                frames = 0
+            }
             if pixels
                 .render()
                 .map_err(|e| panic!("pixels.render() failed: {}", e))
