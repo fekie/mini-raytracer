@@ -39,6 +39,7 @@ impl World {
         }
     }
 
+    #[inline]
     pub fn draw(&self, frame: &mut [u8]) {
         // iterates through each pixel, we will need to do raytracing to find the color of each pixel
         for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
@@ -261,7 +262,7 @@ impl World {
 
 #[cfg(test)]
 mod tests {
-    use crate::components::{Camera, Canvas, Rgba, Viewport};
+    use crate::components::{Camera, Rgba};
     use crate::World;
     use cgmath::{Vector2, Vector3};
 

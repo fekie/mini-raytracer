@@ -91,13 +91,13 @@ fn main() -> Result<(), Error> {
         lights,
         background_color,
     );
-    world.draw(pixels.get_frame());
 
     let mut frames = 0;
     let mut last_frame_update = Instant::now();
 
     event_loop.run(move |event, _, control_flow| {
         if let Event::RedrawRequested(_) = event {
+            world.draw(pixels.get_frame());
             frames += 1;
             let elapsed = last_frame_update.elapsed().as_millis();
             if elapsed >= 1000 {
@@ -124,7 +124,7 @@ fn main() -> Result<(), Error> {
                 return;
             }
 
-            // Resize the window
+            // 3 the window
             if let Some(size) = input.window_resized() {
                 pixels.resize_surface(size.width, size.height);
             }
