@@ -4,8 +4,8 @@ use mini_raytracer::components::{Camera, Light, Rgba, Sphere};
 use mini_raytracer::World;
 use std::time::Duration;
 
-const WIDTH: i32 = 800;
-const HEIGHT: i32 = 800;
+const WIDTH: i32 = 400;
+const HEIGHT: i32 = 400;
 const REFLECTION_PASSES: u32 = 3;
 
 pub fn world_draw(c: &mut Criterion) {
@@ -24,6 +24,7 @@ pub fn world_draw(c: &mut Criterion) {
 
         b.iter(|| world.draw_parallel(frame.as_mut_slice()))
     });
+    group.finish();
 }
 
 criterion_group!(benches, world_draw);

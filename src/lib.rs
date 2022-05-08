@@ -2,10 +2,13 @@ use std::thread::{self, JoinHandle};
 
 use cgmath::{num_traits::Pow, InnerSpace, Vector2, Vector3};
 use components::{Camera, Canvas, Light, Rgba, Sphere, Viewport};
+use rayon;
+use rayon::prelude::*;
+use std::collections::HashMap;
 
 pub mod components;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Copy)]
 /// [`ThickRow`] starts at start_y and ends at end_y. It includes all of the x values. End_y is non-inclusive.
 pub struct ThickRow {
     start_y: u32,
@@ -98,10 +101,7 @@ impl World {
     #[inline]
     pub fn draw_parallel(&self, frame: &mut [u8]) {
         // TODO: make column_size and row_size changable
-        let mut thick_rows = ThickRow::split_frame(400, self.height as u32);
-
-        let last_half = thick_rows.pop().unwrap();
-        let first_half = thick_rows.pop().unwrap();
+        let thick_rows = ThickRow::split_frame(50, self.height as u32);
 
         let width = self.width as u32;
         let canvas = self.canvas;
@@ -112,90 +112,48 @@ impl World {
         let all_lights = self.lights.clone();
         let reflection_passes = self.reflection_passes;
 
-        // bottom half first
-        let foo: JoinHandle<Vec<u8>> = thread::spawn(move || {
-            // TODO: pre-allocate
-            let mut pixels = Vec::new();
+        let mut new_frame = Vec::with_capacity(frame.len());
+        let mut meow = thick_rows
+            .par_iter()
+            .enumerate()
+            .map(|(i, thick_row)| {
+                let mut pixels = Vec::new();
 
-            for y in (first_half.start_y)..(first_half.end_y) {
-                for x in 0..(width) {
-                    let frame_coords = Vector2::new(x as f64, y as f64);
+                for y in (thick_row.start_y)..(thick_row.end_y) {
+                    for x in 0..(width) {
+                        let frame_coords = Vector2::new(x as f64, y as f64);
 
-                    // convert the canvas coords to the viewport coords
-                    let direction =
-                        Self::frame_to_viewport_coords(frame_coords, &canvas, &viewport);
+                        // convert the canvas coords to the viewport coords
+                        let direction =
+                            Self::frame_to_viewport_coords(frame_coords, &canvas, &viewport);
 
-                    let rgba = Self::trace_ray(
-                        camera.position,
-                        camera,
-                        direction,
-                        background_color,
-                        &all_spheres,
-                        &all_lights,
-                        1.0,
-                        f64::MAX,
-                        reflection_passes,
-                    );
+                        let rgba = Self::trace_ray(
+                            camera.position,
+                            camera,
+                            direction,
+                            background_color,
+                            &all_spheres,
+                            &all_lights,
+                            1.0,
+                            f64::MAX,
+                            reflection_passes,
+                        );
 
-                    pixels.push(rgba.r as u8);
-                    pixels.push(rgba.g as u8);
-                    pixels.push(rgba.b as u8);
-                    pixels.push(rgba.a as u8);
+                        pixels.push(rgba.r as u8);
+                        pixels.push(rgba.g as u8);
+                        pixels.push(rgba.b as u8);
+                        pixels.push(rgba.a as u8);
+                    }
                 }
-            }
-            pixels
-        });
+                (i, pixels)
+            })
+            .collect::<HashMap<usize, Vec<u8>>>();
 
-        let width = self.width as u32;
-        let canvas = self.canvas;
-        let viewport = self.viewport;
-        let camera = self.camera;
-        let background_color = self.background_color;
-        let all_spheres = self.spheres.clone();
-        let all_lights = self.lights.clone();
-        let reflection_passes = self.reflection_passes;
+        for i in 0..meow.len() {
+            new_frame.append(meow.get_mut(&i).unwrap())
+        }
 
-        // top half last
-        let bar: JoinHandle<Vec<u8>> = thread::spawn(move || {
-            // TODO: pre-allocate
-            let mut pixels = Vec::new();
-
-            for y in (last_half.start_y)..(last_half.end_y) {
-                for x in 0..(width) {
-                    let frame_coords = Vector2::new(x as f64, y as f64);
-
-                    // convert the canvas coords to the viewport coords
-                    let direction =
-                        Self::frame_to_viewport_coords(frame_coords, &canvas, &viewport);
-
-                    let rgba = Self::trace_ray(
-                        camera.position,
-                        camera,
-                        direction,
-                        background_color,
-                        &all_spheres,
-                        &all_lights,
-                        1.0,
-                        f64::MAX,
-                        reflection_passes,
-                    );
-
-                    pixels.push(rgba.r as u8);
-                    pixels.push(rgba.g as u8);
-                    pixels.push(rgba.b as u8);
-                    pixels.push(rgba.a as u8);
-                }
-            }
-            pixels
-        });
-
-        let mut rendered_first_half = foo.join().unwrap();
-        let mut rendered_last_half = bar.join().unwrap();
-
-        // we will also use rendered_first_half as the "full" frame
-        rendered_first_half.append(&mut rendered_last_half);
-
-        frame.copy_from_slice(&rendered_first_half);
+        frame.copy_from_slice(&new_frame);
     }
 
     /// Loops through all the spheres and finds any intersections between the ray and points on the spheres.
@@ -425,127 +383,4 @@ impl World {
 
         (closest_sphere, closest_t)
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::components::{Camera, Rgba};
-    use crate::World;
-    use cgmath::{Vector2, Vector3};
-
-    fn return_world_with_canvas_dim(width: f64, height: f64) -> World {
-        World::new(
-            width,
-            height,
-            1,
-            Camera::new(Vector3::new(0.0, 0.0, 0.0)),
-            vec![],
-            vec![],
-            Rgba::new(0.0, 0.0, 0.0, 0.0),
-        )
-    }
-
-    #[test]
-    fn frame_to_canvas() {
-        let frame_coords = Vector2::new(50.0, 50.0);
-        let world = return_world_with_canvas_dim(300.0, 300.0);
-        let canvas_coords = world.frame_to_canvas_coords(frame_coords);
-        assert_eq!(canvas_coords, Vector2::new(-100.0, 100.0));
-
-        let frame_coords = Vector2::new(150.0, 150.0);
-        let world = return_world_with_canvas_dim(300.0, 300.0);
-        let canvas_coords = world.frame_to_canvas_coords(frame_coords);
-        assert_eq!(canvas_coords, Vector2::new(0.0, 0.0));
-
-        // 299 is the highest x and y value in frame coords with a width and height of 300 because the index starts at 0
-        let frame_coords = Vector2::new(299.0, 299.0);
-        let world = return_world_with_canvas_dim(300.0, 300.0);
-        let canvas_coords = world.frame_to_canvas_coords(frame_coords);
-        assert_eq!(canvas_coords, Vector2::new(149.0, -149.0));
-
-        let frame_coords = Vector2::new(0.0, 299.0);
-        let world = return_world_with_canvas_dim(300.0, 300.0);
-        let canvas_coords = world.frame_to_canvas_coords(frame_coords);
-        assert_eq!(canvas_coords, Vector2::new(-150.0, -149.0));
-
-        let frame_coords = Vector2::new(299.0, 0.0);
-        let world = return_world_with_canvas_dim(300.0, 300.0);
-        let canvas_coords = world.frame_to_canvas_coords(frame_coords);
-        assert_eq!(canvas_coords, Vector2::new(149.0, 150.0));
-    }
-
-    // need to find a way to be able to test this again
-    /* #[test]
-    fn canvas_to_viewport() {
-        let canvas = Canvas::new(300.0, 300.0);
-        let viewport = Viewport::new(300.0, 300.0, 1.0);
-        let world = World::new(
-            100.0,
-            100.0,
-            1,
-            Camera::new(Vector3::new(0.0, 0.0, 0.0)),
-            vec![],
-            vec![],
-            Rgba::new(0.0, 0.0, 0.0, 0.0),
-        );
-        let canvas_coords = Vector2::new(100.0, 100.0);
-        let viewport_coords = world.canvas_to_viewport_coords(canvas_coords);
-        assert_eq!(viewport_coords, Vector3::new(100.0, 100.0, 1.0));
-
-        // "squeezes" the viewport by a factor of 2
-        let canvas = Canvas::new(600.0, 600.0);
-        let viewport = Viewport::new(300.0, 300.0, 1.0);
-        let world = World::new(
-            100.0,
-            100.0,
-            1,
-            Camera::new(Vector3::new(0.0, 0.0, 0.0)),
-            vec![],
-            vec![],
-            Rgba::new(0.0, 0.0, 0.0, 0.0),
-        );
-        let canvas_coords = Vector2::new(100.0, 100.0);
-        let viewport_coords = world.canvas_to_viewport_coords(canvas_coords);
-        assert_eq!(viewport_coords, Vector3::new(50.0, 50.0, 1.0));
-
-        let canvas = Canvas::new(100.0, 100.0);
-        let viewport = Viewport::new(1.0, 1.0, 1.0);
-        let world = World::new(
-            100.0,
-            100.0,
-            1,
-            Camera::new(Vector3::new(0.0, 0.0, 0.0)),
-            vec![],
-            vec![],
-            Rgba::new(0.0, 0.0, 0.0, 0.0),
-        );
-        let canvas_coords = Vector2::new(40.0, 40.0);
-        let viewport_coords = world.canvas_to_viewport_coords(canvas_coords);
-        assert_eq!(viewport_coords, Vector3::new(0.4, 0.4, 1.0));
-
-        let canvas = Canvas::new(100.0, 100.0);
-        let viewport = Viewport::new(1.0, 1.0, 1.0);
-        let world = World::new(
-            100.0,
-            100.0,
-            1,
-            Camera::new(Vector3::new(0.0, 0.0, 0.0)),
-            vec![],
-            vec![],
-            Rgba::new(0.0, 0.0, 0.0, 0.0),
-        );
-        let canvas_coords = Vector2::new(-40.0, -40.0);
-        let viewport_coords = world.canvas_to_viewport_coords(canvas_coords);
-        assert_eq!(viewport_coords, Vector3::new(-0.4, -0.4, 1.0));
-    } */
-
-    // same with this
-    /* #[test]
-    fn frame_to_viewport() {
-        let canvas = Canvas::new(100.0, 100.0);
-        let viewport = Viewport::new(1.0, 1.0, 1.0);
-        let frame_coords = Vector2::new(90.0, 10.0);
-        let viewport_coords = frame_to_viewport_coords(frame_coords, &canvas, &viewport);
-        assert_eq!(viewport_coords, Vector3::new(0.4, 0.4, 1.0));
-    } */
 }

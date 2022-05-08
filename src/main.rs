@@ -10,8 +10,8 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 
-const WIDTH: i32 = 800;
-const HEIGHT: i32 = 800;
+const WIDTH: i32 = 400;
+const HEIGHT: i32 = 400;
 const REFLECTION_PASSES: u32 = 3;
 
 fn main() -> Result<(), Error> {
