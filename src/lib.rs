@@ -1,7 +1,34 @@
+use std::thread::{self, JoinHandle};
+
 use cgmath::{num_traits::Pow, InnerSpace, Vector2, Vector3};
 use components::{Camera, Canvas, Light, Rgba, Sphere, Viewport};
 
 pub mod components;
+
+#[derive(Clone, Debug)]
+/// [`ThickRow`] starts at start_y and ends at end_y. It includes all of the x values. End_y is non-inclusive.
+pub struct ThickRow {
+    start_y: u32,
+    end_y: u32,
+}
+
+impl ThickRow {
+    pub fn new(start_y: u32, end_y: u32) -> Self {
+        Self { start_y, end_y }
+    }
+
+    pub fn split_frame(row_size: u32, height: u32) -> Vec<Self> {
+        assert_eq!(height % row_size, 0);
+        let mut frame_chunks = Vec::new();
+
+        for start_y in (0..height).step_by(row_size as usize) {
+            let end_y = start_y + row_size;
+            frame_chunks.push(Self::new(start_y, end_y));
+        }
+
+        frame_chunks
+    }
+}
 
 pub struct World {
     width: f64,
@@ -49,11 +76,16 @@ impl World {
             let frame_coords = Vector2::new(x, y);
 
             // convert the canvas coords to the viewport coords
-            let direction = self.frame_to_viewport_coords(frame_coords);
+            let direction =
+                Self::frame_to_viewport_coords(frame_coords, &self.canvas, &self.viewport);
 
-            let rgba = self.trace_ray(
+            let rgba = Self::trace_ray(
                 self.camera.position,
+                self.camera,
                 direction,
+                self.background_color,
+                &self.spheres,
+                &self.lights,
                 1.0,
                 f64::MAX,
                 self.reflection_passes,
@@ -61,6 +93,109 @@ impl World {
 
             pixel.copy_from_slice(&rgba.to_u8_array());
         }
+    }
+
+    #[inline]
+    pub fn draw_parallel(&self, frame: &mut [u8]) {
+        // TODO: make column_size and row_size changable
+        let mut thick_rows = ThickRow::split_frame(400, self.height as u32);
+
+        let last_half = thick_rows.pop().unwrap();
+        let first_half = thick_rows.pop().unwrap();
+
+        let width = self.width as u32;
+        let canvas = self.canvas;
+        let viewport = self.viewport;
+        let camera = self.camera;
+        let background_color = self.background_color;
+        let all_spheres = self.spheres.clone();
+        let all_lights = self.lights.clone();
+        let reflection_passes = self.reflection_passes;
+
+        // bottom half first
+        let foo: JoinHandle<Vec<u8>> = thread::spawn(move || {
+            // TODO: pre-allocate
+            let mut pixels = Vec::new();
+
+            for y in (first_half.start_y)..(first_half.end_y) {
+                for x in 0..(width) {
+                    let frame_coords = Vector2::new(x as f64, y as f64);
+
+                    // convert the canvas coords to the viewport coords
+                    let direction =
+                        Self::frame_to_viewport_coords(frame_coords, &canvas, &viewport);
+
+                    let rgba = Self::trace_ray(
+                        camera.position,
+                        camera,
+                        direction,
+                        background_color,
+                        &all_spheres,
+                        &all_lights,
+                        1.0,
+                        f64::MAX,
+                        reflection_passes,
+                    );
+
+                    pixels.push(rgba.r as u8);
+                    pixels.push(rgba.g as u8);
+                    pixels.push(rgba.b as u8);
+                    pixels.push(rgba.a as u8);
+                }
+            }
+            pixels
+        });
+
+        let width = self.width as u32;
+        let canvas = self.canvas;
+        let viewport = self.viewport;
+        let camera = self.camera;
+        let background_color = self.background_color;
+        let all_spheres = self.spheres.clone();
+        let all_lights = self.lights.clone();
+        let reflection_passes = self.reflection_passes;
+
+        // top half last
+        let bar: JoinHandle<Vec<u8>> = thread::spawn(move || {
+            // TODO: pre-allocate
+            let mut pixels = Vec::new();
+
+            for y in (last_half.start_y)..(last_half.end_y) {
+                for x in 0..(width) {
+                    let frame_coords = Vector2::new(x as f64, y as f64);
+
+                    // convert the canvas coords to the viewport coords
+                    let direction =
+                        Self::frame_to_viewport_coords(frame_coords, &canvas, &viewport);
+
+                    let rgba = Self::trace_ray(
+                        camera.position,
+                        camera,
+                        direction,
+                        background_color,
+                        &all_spheres,
+                        &all_lights,
+                        1.0,
+                        f64::MAX,
+                        reflection_passes,
+                    );
+
+                    pixels.push(rgba.r as u8);
+                    pixels.push(rgba.g as u8);
+                    pixels.push(rgba.b as u8);
+                    pixels.push(rgba.a as u8);
+                }
+            }
+            pixels
+        });
+
+        let mut rendered_first_half = foo.join().unwrap();
+        let mut rendered_last_half = bar.join().unwrap();
+
+        // we will also use rendered_first_half as the "full" frame
+        rendered_first_half.append(&mut rendered_last_half);
+
+        frame.copy_from_slice(&rendered_first_half);
     }
 
     /// Loops through all the spheres and finds any intersections between the ray and points on the spheres.
@@ -100,40 +235,51 @@ impl World {
         (2.0 * normal * normal.dot(ray)) - ray
     }
 
-    pub fn frame_to_canvas_coords(&self, frame_coords: Vector2<f64>) -> Vector2<f64> {
-        let cx = frame_coords.x - (self.canvas.width as f64 / 2.0);
-        let cy = (self.canvas.height as f64 / 2.0) - frame_coords.y;
+    pub fn frame_to_canvas_coords(frame_coords: Vector2<f64>, canvas: &Canvas) -> Vector2<f64> {
+        let cx = frame_coords.x - (canvas.width as f64 / 2.0);
+        let cy = (canvas.height as f64 / 2.0) - frame_coords.y;
         Vector2::new(cx, cy)
     }
 
-    pub fn canvas_to_viewport_coords(&self, canvas_coords: Vector2<f64>) -> Vector3<f64> {
-        let vx = canvas_coords.x * (self.viewport.width / self.width);
-        let vy = canvas_coords.y * (self.viewport.height / self.height);
-        Vector3::new(vx, vy, self.viewport.depth)
+    pub fn canvas_to_viewport_coords(
+        canvas_coords: Vector2<f64>,
+        canvas: &Canvas,
+        viewport: &Viewport,
+    ) -> Vector3<f64> {
+        let vx = canvas_coords.x * (viewport.width / canvas.width);
+        let vy = canvas_coords.y * (viewport.height / canvas.height);
+        Vector3::new(vx, vy, viewport.depth)
     }
 
-    pub fn frame_to_viewport_coords(&self, frame_coords: Vector2<f64>) -> Vector3<f64> {
-        let canvas_coords = self.frame_to_canvas_coords(frame_coords);
-        self.canvas_to_viewport_coords(canvas_coords)
+    pub fn frame_to_viewport_coords(
+        frame_coords: Vector2<f64>,
+        canvas: &Canvas,
+        viewport: &Viewport,
+    ) -> Vector3<f64> {
+        let canvas_coords = Self::frame_to_canvas_coords(frame_coords, canvas);
+        Self::canvas_to_viewport_coords(canvas_coords, canvas, viewport)
     }
 
     /// Returns a color if the ray hits a sphere.
     /// Returns background_color if the ray does not hit
     pub fn trace_ray(
-        &self,
         origin: Vector3<f64>,
+        camera: Camera,
         direction: Vector3<f64>,
+        background_color: Rgba,
+        all_spheres: &Vec<Sphere>,
+        all_lights: &Vec<Light>,
         t_min: f64,
         t_max: f64,
         recursion_depth: u32,
     ) -> Rgba {
         let (closest_sphere, closest_t) =
-            self.closest_sphere_intersection(origin, direction, t_min, t_max);
+            Self::closest_sphere_intersection(origin, direction, all_spheres, t_min, t_max);
 
         let surface_point = origin + (closest_t * direction);
 
         if closest_sphere.is_none() {
-            return self.background_color;
+            return background_color;
         }
 
         // this will always not panic because we already checked to see if it was None
@@ -141,7 +287,13 @@ impl World {
 
         let local_color = unwrapped_sphere
             .color
-            .multiply(self.compute_lighting_intensity(surface_point, unwrapped_sphere));
+            .multiply(Self::compute_lighting_intensity(
+                surface_point,
+                camera,
+                unwrapped_sphere,
+                all_spheres,
+                all_lights,
+            ));
 
         // if we hit the recursion limit, or the object is not reflective, we can go ahead and return the color
         let reflective = unwrapped_sphere.reflective;
@@ -151,9 +303,13 @@ impl World {
             let surface_normal = (surface_point - unwrapped_sphere.center).normalize();
             // this reflection will point in the direction of where we need to look for intersections
             let reflection = Self::reflect_ray_over_normal(-direction, surface_normal);
-            let reflected_color = self.trace_ray(
+            let reflected_color = Self::trace_ray(
                 surface_point,
+                camera,
                 reflection,
+                background_color,
+                all_spheres,
+                all_lights,
                 0.00001,
                 f64::MAX,
                 recursion_depth - 1,
@@ -166,12 +322,18 @@ impl World {
     }
 
     // Computes the lighting intensity using lighting diffusion and specular illumination
-    pub fn compute_lighting_intensity(&self, surface_point: Vector3<f64>, sphere: Sphere) -> f64 {
+    pub fn compute_lighting_intensity(
+        surface_point: Vector3<f64>,
+        camera: Camera,
+        sphere: Sphere,
+        all_spheres: &Vec<Sphere>,
+        all_lights: &Vec<Light>,
+    ) -> f64 {
         let mut i = 0.0;
 
         let surface_normal = (surface_point - sphere.center).normalize();
 
-        for light in &self.lights {
+        for light in all_lights {
             if let Light::Ambient(_i) = light {
                 i += _i;
                 continue;
@@ -189,8 +351,13 @@ impl World {
 
             // shadow check
             // we dont want t_min == 0 so that so that the sphere doesnt intersect itself
-            let (shadow_sphere, _shadow_t) =
-                self.closest_sphere_intersection(surface_point, direction, 0.0000001, t_max);
+            let (shadow_sphere, _shadow_t) = Self::closest_sphere_intersection(
+                surface_point,
+                direction,
+                all_spheres,
+                0.0000001,
+                t_max,
+            );
 
             if shadow_sphere.is_some() {
                 continue;
@@ -222,7 +389,7 @@ impl World {
             let r = (2.0 * surface_normal * normal_dot_direction) - direction;
 
             // v is the "view vector" that points from the surface point to the camera
-            let v = self.camera.position - surface_point;
+            let v = camera.position - surface_point;
             let specular_multiplier =
                 (r.dot(v) / (r.magnitude() * v.magnitude())).pow(sphere.specular);
 
@@ -235,16 +402,16 @@ impl World {
     /// Returns the sphere, and the value t, if an intersection was found.
     /// t will == f64::MAX if no intersection is found.
     pub fn closest_sphere_intersection(
-        &self,
         origin: Vector3<f64>,
         direction: Vector3<f64>,
+        spheres: &Vec<Sphere>,
         t_min: f64,
         t_max: f64,
     ) -> (Option<Sphere>, f64) {
         let mut closest_t = f64::MAX;
         let mut closest_sphere = None;
 
-        for sphere in &self.spheres {
+        for sphere in spheres {
             let (t1, t2) = Self::intersect_ray_sphere(origin, direction, *sphere);
             if (t1 >= t_min) && (t1 <= t_max) && (t1 < closest_t) {
                 closest_t = t1;

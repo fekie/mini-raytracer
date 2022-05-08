@@ -74,6 +74,7 @@ impl std::ops::Add for Rgba {
     }
 }
 
+#[derive(Clone, Debug, Copy)]
 pub struct Viewport {
     pub width: f64,
     pub height: f64,
@@ -90,6 +91,7 @@ impl Viewport {
     }
 }
 
+#[derive(Clone, Debug, Copy)]
 pub struct Canvas {
     pub width: f64,
     pub height: f64,
@@ -101,6 +103,7 @@ impl Canvas {
     }
 }
 
+#[derive(Clone, Debug, Copy)]
 /// Contains all the possible lights:
 ///
 /// Direction (contains direction value)

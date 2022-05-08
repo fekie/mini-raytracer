@@ -2,6 +2,7 @@ use cgmath::Vector3;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use mini_raytracer::components::{Camera, Light, Rgba, Sphere};
 use mini_raytracer::World;
+use std::time::Duration;
 
 const WIDTH: i32 = 800;
 const HEIGHT: i32 = 800;
@@ -9,12 +10,19 @@ const REFLECTION_PASSES: u32 = 3;
 
 pub fn world_draw(c: &mut Criterion) {
     let mut group = c.benchmark_group("world.draw");
-    group.sample_size(25);
-    group.bench_function("world.draw", |b| {
+    group.sample_size(10);
+    group.measurement_time(Duration::from_secs(10));
+    group.bench_function("world.draw (sequential)", |b| {
         let world = generate_world();
         let mut frame = generate_frame();
 
         b.iter(|| world.draw(frame.as_mut_slice()))
+    });
+    group.bench_function("world.draw (parallel)", |b| {
+        let world = generate_world();
+        let mut frame = generate_frame();
+
+        b.iter(|| world.draw_parallel(frame.as_mut_slice()))
     });
 }
 

@@ -97,7 +97,7 @@ fn main() -> Result<(), Error> {
 
     event_loop.run(move |event, _, control_flow| {
         if let Event::RedrawRequested(_) = event {
-            world.draw(pixels.get_frame());
+            world.draw_parallel(pixels.get_frame());
             frames += 1;
             let elapsed = last_frame_update.elapsed().as_millis();
             if elapsed >= 1000 {
