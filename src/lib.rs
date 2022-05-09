@@ -1,8 +1,5 @@
-use std::thread::{self, JoinHandle};
-
 use cgmath::{num_traits::Pow, InnerSpace, Vector2, Vector3};
 use components::{Camera, Canvas, Light, Rgba, Sphere, Viewport};
-use rayon;
 use rayon::prelude::*;
 use std::collections::HashMap;
 
@@ -101,7 +98,8 @@ impl World {
     #[inline]
     pub fn draw_parallel(&self, frame: &mut [u8]) {
         // TODO: make column_size and row_size changable
-        let thick_rows = ThickRow::split_frame(100, self.height as u32);
+        // splits frame computation in 4 threads
+        let thick_rows = ThickRow::split_frame(125, self.height as u32);
 
         let width = self.width as u32;
         let canvas = self.canvas;

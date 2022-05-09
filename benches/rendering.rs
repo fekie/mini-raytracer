@@ -1,11 +1,11 @@
 use cgmath::Vector3;
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use mini_raytracer::components::{Camera, Light, Rgba, Sphere};
 use mini_raytracer::World;
 use std::time::Duration;
 
-const WIDTH: i32 = 400;
-const HEIGHT: i32 = 400;
+const WIDTH: i32 = 500;
+const HEIGHT: i32 = 500;
 const REFLECTION_PASSES: u32 = 3;
 
 pub fn world_draw(c: &mut Criterion) {
@@ -38,27 +38,36 @@ pub fn generate_frame() -> Vec<u8> {
 pub fn generate_world() -> World {
     let spheres = vec![
         Sphere::new(
-            Vector3::new(0.0, -1.0, 4.0),
+            Vector3::new(0.0, 1.0, 4.0),
+            Rgba::new(255.0, 255.0, 255.0, 255.0),
+            0.7,
+            // very shiny
+            1000.0,
+            // 70% reflective
+            0.7,
+        ),
+        Sphere::new(
+            Vector3::new(0.0, -1.0, 3.5),
             Rgba::new(255.0, 0.0, 0.0, 255.0),
-            1.0,
+            0.95,
             // shiny
             500.0,
             // 20% reflective
             0.2,
         ),
         Sphere::new(
-            Vector3::new(2.0, 0.0, 5.0),
+            Vector3::new(2.0, 0.0, 4.5),
             Rgba::new(0.0, 0.0, 255.0, 255.0),
-            1.0,
+            0.95,
             // shiny
             500.0,
             // 30% reflective
             0.3,
         ),
         Sphere::new(
-            Vector3::new(-2.0, 0.0, 5.0),
+            Vector3::new(-2.0, 0.0, 4.5),
             Rgba::new(0.0, 255.0, 0.0, 255.0),
-            1.0,
+            0.95,
             // somewhat shiny
             10.0,
             //40% reflective

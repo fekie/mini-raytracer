@@ -10,8 +10,8 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 
-const WIDTH: i32 = 600;
-const HEIGHT: i32 = 600;
+const WIDTH: i32 = 500;
+const HEIGHT: i32 = 500;
 const REFLECTION_PASSES: u32 = 3;
 
 fn main() -> Result<(), Error> {
@@ -35,36 +35,36 @@ fn main() -> Result<(), Error> {
 
     let spheres = vec![
         Sphere::new(
-            Vector3::new(0.0, 1.0, 4.0),
+            Vector3::new(0.0, 1.0, 0.0),
             Rgba::new(255.0, 255.0, 255.0, 255.0),
             0.7,
-            // shiny
+            // very shiny
             1000.0,
-            // 20% reflective
+            // 70% reflective
             0.7,
         ),
         Sphere::new(
-            Vector3::new(0.0, -1.0, 4.0),
+            Vector3::new(0.0, -1.0, 3.5),
             Rgba::new(255.0, 0.0, 0.0, 255.0),
-            1.0,
+            0.95,
             // shiny
             500.0,
             // 20% reflective
             0.2,
         ),
         Sphere::new(
-            Vector3::new(2.0, 0.0, 5.0),
+            Vector3::new(2.0, 0.0, 4.5),
             Rgba::new(0.0, 0.0, 255.0, 255.0),
-            1.0,
+            0.95,
             // shiny
             500.0,
             // 30% reflective
             0.3,
         ),
         Sphere::new(
-            Vector3::new(-2.0, 0.0, 5.0),
+            Vector3::new(-2.0, 0.0, 4.5),
             Rgba::new(0.0, 255.0, 0.0, 255.0),
-            1.0,
+            0.95,
             // somewhat shiny
             10.0,
             //40% reflective
@@ -109,9 +109,9 @@ fn main() -> Result<(), Error> {
     let orbiting_sphere_radius = 1.0;
     event_loop.run(move |event, _, control_flow| {
         if let Event::RedrawRequested(_) = event {
-            orbiting_sphere_angle += 0.05;
-            // polar to cartesian
-            let x = (orbiting_sphere_angle.cos() * orbiting_sphere_radius);
+            orbiting_sphere_angle += 0.04;
+            // polar to cartesian + an offset added to z
+            let x = orbiting_sphere_angle.cos() * orbiting_sphere_radius;
             let z = (orbiting_sphere_angle.sin() * orbiting_sphere_radius) + 5.0;
             let y = 1.5;
             world.spheres[0].center.x = x;
