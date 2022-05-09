@@ -10,8 +10,8 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 
-const WIDTH: i32 = 400;
-const HEIGHT: i32 = 400;
+const WIDTH: i32 = 600;
+const HEIGHT: i32 = 600;
 const REFLECTION_PASSES: u32 = 3;
 
 fn main() -> Result<(), Error> {
@@ -34,6 +34,15 @@ fn main() -> Result<(), Error> {
     };
 
     let spheres = vec![
+        Sphere::new(
+            Vector3::new(0.0, 1.0, 4.0),
+            Rgba::new(255.0, 255.0, 255.0, 255.0),
+            0.7,
+            // shiny
+            1000.0,
+            // 20% reflective
+            0.7,
+        ),
         Sphere::new(
             Vector3::new(0.0, -1.0, 4.0),
             Rgba::new(255.0, 0.0, 0.0, 255.0),
@@ -82,7 +91,7 @@ fn main() -> Result<(), Error> {
 
     let camera = Camera::new(Vector3::new(0.0, 0.0, 0.0));
 
-    let world = World::new(
+    let mut world = World::new(
         WIDTH.into(),
         HEIGHT.into(),
         REFLECTION_PASSES,
@@ -95,8 +104,20 @@ fn main() -> Result<(), Error> {
     let mut frames = 0;
     let mut last_frame_update = Instant::now();
 
+    // in radians
+    let mut orbiting_sphere_angle: f64 = 0.0;
+    let orbiting_sphere_radius = 1.0;
     event_loop.run(move |event, _, control_flow| {
         if let Event::RedrawRequested(_) = event {
+            orbiting_sphere_angle += 0.05;
+            // polar to cartesian
+            let x = (orbiting_sphere_angle.cos() * orbiting_sphere_radius);
+            let z = (orbiting_sphere_angle.sin() * orbiting_sphere_radius) + 5.0;
+            let y = 1.5;
+            world.spheres[0].center.x = x;
+            world.spheres[0].center.y = y;
+            world.spheres[0].center.z = z;
+
             world.draw_parallel(pixels.get_frame());
             frames += 1;
             let elapsed = last_frame_update.elapsed().as_millis();

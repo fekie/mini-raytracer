@@ -41,8 +41,8 @@ pub struct World {
     camera: Camera,
     canvas: Canvas,
     viewport: Viewport,
-    spheres: Vec<Sphere>,
-    lights: Vec<Light>,
+    pub spheres: Vec<Sphere>,
+    pub lights: Vec<Light>,
     background_color: Rgba,
 }
 
@@ -101,7 +101,7 @@ impl World {
     #[inline]
     pub fn draw_parallel(&self, frame: &mut [u8]) {
         // TODO: make column_size and row_size changable
-        let thick_rows = ThickRow::split_frame(50, self.height as u32);
+        let thick_rows = ThickRow::split_frame(100, self.height as u32);
 
         let width = self.width as u32;
         let canvas = self.canvas;
@@ -218,6 +218,7 @@ impl World {
         Self::canvas_to_viewport_coords(canvas_coords, canvas, viewport)
     }
 
+    #[allow(clippy::too_many_arguments)]
     /// Returns a color if the ray hits a sphere.
     /// Returns background_color if the ray does not hit
     pub fn trace_ray(
