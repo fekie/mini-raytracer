@@ -1,5 +1,5 @@
 # mini-raytracer
-A cpu-based raytracer written in rust. This project was written by me to learn about computer graphics, specifically rayracing. 
+A cpu-based raytracer written in rust. This project was written by me to learn about computer graphics, specifically rayracing.
 
 # Features
 * Parallelized frame computation.
