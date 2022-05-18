@@ -5,6 +5,108 @@ use std::collections::HashMap;
 
 pub mod components;
 
+/// [`BigChunk`] carries the four corners of an 8x8 chunk of the screen.
+/// If the four corners are different by a threshold of h, subdivide the chunk into 4x4 chunks.
+/// When subdivided, this chunk becomes a [`MediumChunk`].
+#[derive(Clone, Debug, Copy)]
+pub struct BigChunk {
+    top_left: Vector2<usize>,
+    top_left_color: Option<Rgba>,
+    top_right: Vector2<usize>,
+    top_right_color: Option<Rgba>,
+    bottom_left: Vector2<usize>,
+    bottom_left_color: Option<Rgba>,
+    bottom_right: Vector2<usize>,
+    bottom_right_color: Option<Rgba>,
+}
+
+impl BigChunk {
+    /// Only needs the x and y values of the top left corner of the chunk.
+    pub fn new(x: usize, y: usize) -> Self {
+        Self {
+            top_left: Vector2::new(x, y),
+            top_left_color: None,
+            top_right: Vector2::new(x + 7, y),
+            top_right_color: None,
+            bottom_left: Vector2::new(x, y + 7),
+            bottom_left_color: None,
+            bottom_right: Vector2::new(x + 7, y + 7),
+            bottom_right_color: None,
+        }
+    }
+
+    /// Chunks will go from left to right, top to bottom.
+    pub fn from_frame_dimensions(width: usize, height: usize) -> Vec<BigChunk> {
+        assert_eq!(width, height);
+        assert_eq!(width % 8, 0);
+
+        let chunks_per_row = width / 8;
+        let big_chunk_amount = chunks_per_row * chunks_per_row;
+        let mut big_chunks = Vec::with_capacity(big_chunk_amount);
+
+        for y in (0..width).step_by(8) {
+            for x in (0..width).step_by(8) {
+                let big_chunk = Self::new(x, y);
+                big_chunks.push(big_chunk);
+            }
+        }
+
+        big_chunks
+    }
+
+    /// Index 0 is top left, index 1 is top right
+    /// index 2 is bottom left, index 3 is bottom right.
+    pub fn subdivide(&self) -> Vec<MediumChunk> {
+        todo!()
+    }
+
+    // TODO: make this only enabled by a feature or something.
+    pub fn debug(big_chunks: &Vec<BigChunk>, canvas_width: usize, frame: &mut [u8]) {
+        for big_chunk in big_chunks {
+            let index = ((big_chunk.top_left.y * canvas_width) + big_chunk.top_left.x) * 4;
+            frame[index] = 255;
+            frame[index + 1] = 255;
+            frame[index + 2] = 255;
+        }
+    }
+}
+
+/// [`MediumChunk`] carries the four corners of a 4x4 chunk of the screen.
+/// Subdivides to [`SmallChunk`] (2x2)
+#[derive(Clone, Debug, Copy)]
+pub struct MediumChunk {
+    top_left: Vector2<u32>,
+    top_left_color: Option<Rgba>,
+    top_right: Vector2<u32>,
+    top_right_color: Option<Rgba>,
+    bottom_left: Vector2<u32>,
+    bottom_left_color: Option<Rgba>,
+    bottom_right: Vector2<u32>,
+    bottom_right_color: Option<Rgba>,
+}
+
+impl MediumChunk {
+    /// Index 0 is top left, index 1 is top right
+    /// index 2 is bottom left, index 3 is bottom right.
+    pub fn subdivide(&self) -> Vec<SmallChunk> {
+        todo!()
+    }
+}
+
+/// [`SmallChunk`] carries the four corners of a 2x2 chunk of the screen.
+/// Cannot be subdivided further.
+#[derive(Clone, Debug, Copy)]
+pub struct SmallChunk {
+    top_left: Vector2<u32>,
+    top_left_color: Option<Rgba>,
+    top_right: Vector2<u32>,
+    top_right_color: Option<Rgba>,
+    bottom_left: Vector2<u32>,
+    bottom_left_color: Option<Rgba>,
+    bottom_right: Vector2<u32>,
+    bottom_right_color: Option<Rgba>,
+}
+
 #[derive(Clone, Debug, Copy)]
 /// [`ThickRow`] starts at start_y and ends at end_y. It includes all of the x values. End_y is non-inclusive.
 pub struct ThickRow {
@@ -381,5 +483,18 @@ impl World {
         }
 
         (closest_sphere, closest_t)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::BigChunk;
+
+    #[test]
+    fn big_chunks_from_frame_dimensions() {
+        let width = 600;
+        let height = 600;
+        let big_chunks = BigChunk::from_frame_dimensions(width, height);
+        assert_eq!(big_chunks.len(), 5625)
     }
 }
