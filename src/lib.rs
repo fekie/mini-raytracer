@@ -61,12 +61,18 @@ impl BigChunk {
     }
 
     // TODO: make this only enabled by a feature or something.
+    /// Draws all big chunks blue.
     pub fn debug(big_chunks: &Vec<BigChunk>, canvas_width: usize, frame: &mut [u8]) {
         for big_chunk in big_chunks {
-            let index = ((big_chunk.top_left.y * canvas_width) + big_chunk.top_left.x) * 4;
-            frame[index] = 255;
-            frame[index + 1] = 255;
-            frame[index + 2] = 255;
+            // left-to-right, top-to-bottom
+            for y in big_chunk.top_left.y..(big_chunk.top_left.y + 8) {
+                for x in big_chunk.top_left.x..(big_chunk.top_left.x + 8) {
+                    let index = ((y * canvas_width) + x) * 4;
+                    frame[index] = 0;
+                    frame[index + 1] = 0;
+                    frame[index + 2] = 255;
+                }
+            }
         }
     }
 }
