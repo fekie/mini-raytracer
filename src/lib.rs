@@ -5,38 +5,20 @@ use std::collections::HashMap;
 
 pub mod components;
 
-/// [`BigChunk`] carries the four corners of an 8x8 chunk of the screen.
-/// If the four corners are different by a threshold of h, subdivide the chunk into 4x4 chunks.
-/// When subdivided, this chunk becomes a [`MediumChunk`].
-#[derive(Clone, Debug, Copy)]
-pub struct BigChunk {
-    top_left: Vector2<usize>,
-    top_left_color: Option<Rgba>,
-    top_right: Vector2<usize>,
-    top_right_color: Option<Rgba>,
-    bottom_left: Vector2<usize>,
-    bottom_left_color: Option<Rgba>,
-    bottom_right: Vector2<usize>,
-    bottom_right_color: Option<Rgba>,
+/// Carries a mutable slice of the frame, as well as the offset for the top left corner.
+#[derive(Debug)]
+pub enum Chunk {
+    // 8x8
+    Large([u8; 256], Vector2<usize>),
+    // 4x4
+    Medium(([u8; 256], Vector2<usize>)),
+    // 2x2
+    Small(([u8; 256], Vector2<usize>)),
 }
 
-impl BigChunk {
-    /// Only needs the x and y values of the top left corner of the chunk.
-    pub fn new(x: usize, y: usize) -> Self {
-        Self {
-            top_left: Vector2::new(x, y),
-            top_left_color: None,
-            top_right: Vector2::new(x + 7, y),
-            top_right_color: None,
-            bottom_left: Vector2::new(x, y + 7),
-            bottom_left_color: None,
-            bottom_right: Vector2::new(x + 7, y + 7),
-            bottom_right_color: None,
-        }
-    }
-
+impl Chunk {
     /// Chunks will go from left to right, top to bottom.
-    pub fn from_frame_dimensions(width: usize, height: usize) -> Vec<BigChunk> {
+    pub fn from_frame_dimensions(width: usize, height: usize) -> Vec<Self> {
         assert_eq!(width, height);
         assert_eq!(width % 8, 0);
 
@@ -46,7 +28,7 @@ impl BigChunk {
 
         for y in (0..width).step_by(8) {
             for x in (0..width).step_by(8) {
-                let big_chunk = Self::new(x, y);
+                let big_chunk = Self::Large([255; 256], Vector2::new(x, y));
                 big_chunks.push(big_chunk);
             }
         }
@@ -62,16 +44,34 @@ impl BigChunk {
 
     // TODO: make this only enabled by a feature or something.
     /// Draws all big chunks blue.
-    pub fn debug(big_chunks: &Vec<BigChunk>, canvas_width: usize, frame: &mut [u8]) {
-        for big_chunk in big_chunks {
+    pub fn debug(chunks: &Vec<Self>, canvas_width: usize, frame: &mut [u8]) {
+        for chunk in chunks {
             // left-to-right, top-to-bottom
-            for y in big_chunk.top_left.y..(big_chunk.top_left.y + 8) {
-                for x in big_chunk.top_left.x..(big_chunk.top_left.x + 8) {
-                    let index = ((y * canvas_width) + x) * 4;
-                    frame[index] = 0;
-                    frame[index + 1] = 0;
-                    frame[index + 2] = 255;
+
+            match chunk {
+                Self::Large(chunk_frame, offset) => {
+                    for y in offset.y..(offset.y + 8) {
+                        //dbg!(y);
+                        if y == offset.y + 1 {
+                            break;
+                        }
+                        for x in offset.x..(offset.x + 8) {
+                            if x == offset.x + 1 {
+                                break;
+                            }
+                            let frame_index = ((y * canvas_width) + x) * 4;
+
+                            // multiplying by 8 instead of the canvas width because the width of the chunk is 8x8
+                            let chunk_frame_index = (((y - offset.y) * 8) + (x - offset.x)) * 4;
+
+                            frame[frame_index] = chunk_frame[chunk_frame_index];
+                            frame[frame_index + 1] = chunk_frame[chunk_frame_index + 1];
+                            frame[frame_index + 2] = chunk_frame[chunk_frame_index + 2];
+                            frame[frame_index + 3] = chunk_frame[chunk_frame_index + 3];
+                        }
+                    }
                 }
+                _ => unreachable!(),
             }
         }
     }

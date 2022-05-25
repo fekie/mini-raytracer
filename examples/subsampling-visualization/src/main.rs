@@ -63,15 +63,17 @@ fn main() -> Result<(), Error> {
         background_color,
     );
 
-    let big_chunks =
-        mini_raytracer::BigChunk::from_frame_dimensions(WIDTH as usize, HEIGHT as usize);
+    let chunks = mini_raytracer::Chunk::from_frame_dimensions(WIDTH as usize, HEIGHT as usize);
+    /* dbg!(chunks.len());
+    panic!(); */
 
     let mut frames = 0;
     let mut last_frame_update = Instant::now();
+    world.draw(pixels.get_frame());
+    mini_raytracer::Chunk::debug(&chunks, WIDTH as usize, pixels.get_frame());
+
     event_loop.run(move |event, _, control_flow| {
         if let Event::RedrawRequested(_) = event {
-            world.draw(pixels.get_frame());
-            mini_raytracer::BigChunk::debug(&big_chunks, WIDTH as usize, pixels.get_frame());
             frames += 1;
             let elapsed = last_frame_update.elapsed().as_millis();
             if elapsed >= 1000 {
