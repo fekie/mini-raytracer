@@ -5,6 +5,8 @@ use std::collections::HashMap;
 
 pub mod components;
 
+const ALLOWED_COLOR_DIFFERENCE: u32 = 30;
+
 /// Carries a mutable slice of the frame, as well as the offset for the top left corner.
 #[derive(Debug)]
 pub enum Chunk {
@@ -36,9 +38,11 @@ impl Chunk {
         big_chunks
     }
 
-    /// Index 0 is top left, index 1 is top right
-    /// index 2 is bottom left, index 3 is bottom right.
-    pub fn subdivide(&self) -> Vec<MediumChunk> {
+    /// Finds the color of the four corner pixels.
+    /// If the color difference between them is too great, it will subdivide into smaller chunks.
+    /// On subdivision, it finds the color of the four corner pixels, if needed it will subdivide again.
+    /// This function will not subdivide below small chunks.
+    pub fn subdivide(&mut self, world: &World) {
         todo!()
     }
 
@@ -46,28 +50,30 @@ impl Chunk {
     /// Draws all big chunks blue.
     pub fn debug(chunks: &Vec<Self>, canvas_width: usize, frame: &mut [u8]) {
         for chunk in chunks {
-            // left-to-right, top-to-bottom
-
             match chunk {
-                Self::Large(chunk_frame, offset) => {
+                // outlines the large chunks in blue
+                Self::Large(_chunk_frame, offset) => {
                     for y in offset.y..(offset.y + 8) {
-                        //dbg!(y);
-                        if y == offset.y + 1 {
-                            break;
-                        }
                         for x in offset.x..(offset.x + 8) {
-                            if x == offset.x + 1 {
-                                break;
+                            // filter out insides
+                            if (x > offset.x)
+                                && (x < (offset.x + 7))
+                                && (y > offset.y)
+                                && (y < offset.y + 7)
+                            {
+                                continue;
                             }
+
                             let frame_index = ((y * canvas_width) + x) * 4;
 
                             // multiplying by 8 instead of the canvas width because the width of the chunk is 8x8
-                            let chunk_frame_index = (((y - offset.y) * 8) + (x - offset.x)) * 4;
+                            // this is just here for future reference
+                            let _chunk_frame_index = (((y - offset.y) * 8) + (x - offset.x)) * 4;
 
-                            frame[frame_index] = chunk_frame[chunk_frame_index];
-                            frame[frame_index + 1] = chunk_frame[chunk_frame_index + 1];
-                            frame[frame_index + 2] = chunk_frame[chunk_frame_index + 2];
-                            frame[frame_index + 3] = chunk_frame[chunk_frame_index + 3];
+                            frame[frame_index] = 0;
+                            frame[frame_index + 1] = 0;
+                            frame[frame_index + 2] = 255;
+                            frame[frame_index + 3] = 255;
                         }
                     }
                 }
@@ -75,42 +81,6 @@ impl Chunk {
             }
         }
     }
-}
-
-/// [`MediumChunk`] carries the four corners of a 4x4 chunk of the screen.
-/// Subdivides to [`SmallChunk`] (2x2)
-#[derive(Clone, Debug, Copy)]
-pub struct MediumChunk {
-    top_left: Vector2<u32>,
-    top_left_color: Option<Rgba>,
-    top_right: Vector2<u32>,
-    top_right_color: Option<Rgba>,
-    bottom_left: Vector2<u32>,
-    bottom_left_color: Option<Rgba>,
-    bottom_right: Vector2<u32>,
-    bottom_right_color: Option<Rgba>,
-}
-
-impl MediumChunk {
-    /// Index 0 is top left, index 1 is top right
-    /// index 2 is bottom left, index 3 is bottom right.
-    pub fn subdivide(&self) -> Vec<SmallChunk> {
-        todo!()
-    }
-}
-
-/// [`SmallChunk`] carries the four corners of a 2x2 chunk of the screen.
-/// Cannot be subdivided further.
-#[derive(Clone, Debug, Copy)]
-pub struct SmallChunk {
-    top_left: Vector2<u32>,
-    top_left_color: Option<Rgba>,
-    top_right: Vector2<u32>,
-    top_right_color: Option<Rgba>,
-    bottom_left: Vector2<u32>,
-    bottom_left_color: Option<Rgba>,
-    bottom_right: Vector2<u32>,
-    bottom_right_color: Option<Rgba>,
 }
 
 #[derive(Clone, Debug, Copy)]
