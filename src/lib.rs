@@ -30,7 +30,7 @@ impl Chunk {
 
         for y in (0..width).step_by(8) {
             for x in (0..width).step_by(8) {
-                let big_chunk = Self::Large([255; 256], Vector2::new(x, y));
+                let big_chunk = Self::Large([0; 256], Vector2::new(x, y));
                 big_chunks.push(big_chunk);
             }
         }
@@ -44,6 +44,120 @@ impl Chunk {
     /// This function will not subdivide below small chunks.
     pub fn subdivide(&mut self, world: &World) {
         todo!()
+    }
+
+    /// Initially takes a [`Chunk::Large`], then recursively calls render() until all pixels have been rendered.
+    #[allow(clippy::erasing_op)]
+    #[allow(clippy::identity_op)]
+    pub fn render(&mut self, world: &World) {
+        match self {
+            Self::Large(chunk_frame, offset) => {
+                // We will find the colors of the four corners.
+                // If the color difference between them is too big, we subdivide it and call render again.
+                // Follows the equation index = ((y * chunk_width) + x) * 4
+                // Where y and 0 start at 0 and increment to 8
+                let chunk_width = 8;
+                let top_left_starting_index = ((0 * chunk_width) + 0) * 4;
+                let top_right_starting_index = ((0 * chunk_width) + 7) * 4;
+                let bottom_left_starting_index = ((7 * chunk_width) + 0) * 4;
+                let bottom_right_starting_index = ((7 * chunk_width) + 7) * 4;
+
+                let floating_offset = Vector2::new(offset.x as f64, offset.y as f64);
+                let top_left_frame_position = Vector2::new(0.0, 0.0) + floating_offset;
+                let top_right_frame_position = Vector2::new(7.0, 0.0) + floating_offset;
+                let bottom_left_frame_position = Vector2::new(0.0, 7.0) + floating_offset;
+                let bottom_right_frame_position = Vector2::new(7.0, 7.0) + floating_offset;
+
+                let top_left_color = world.trace_ray_parameter_shortcut(top_left_frame_position);
+                let top_right_color = world.trace_ray_parameter_shortcut(top_right_frame_position);
+                let bottom_left_color =
+                    world.trace_ray_parameter_shortcut(bottom_left_frame_position);
+                let bottom_right_color =
+                    world.trace_ray_parameter_shortcut(bottom_right_frame_position);
+
+                Self::set_chunk_frame_pixel_to_color_by_starting_index(
+                    chunk_frame,
+                    top_left_starting_index,
+                    top_left_color,
+                );
+                Self::set_chunk_frame_pixel_to_color_by_starting_index(
+                    chunk_frame,
+                    top_right_starting_index,
+                    top_right_color,
+                );
+                Self::set_chunk_frame_pixel_to_color_by_starting_index(
+                    chunk_frame,
+                    bottom_left_starting_index,
+                    bottom_left_color,
+                );
+                Self::set_chunk_frame_pixel_to_color_by_starting_index(
+                    chunk_frame,
+                    bottom_right_starting_index,
+                    bottom_right_color,
+                );
+            }
+            _ => todo!(),
+        }
+    }
+
+    /// Translates pixels in chunks to pixels in the frame buffer,
+    #[allow(clippy::erasing_op)]
+    #[allow(clippy::identity_op)]
+    pub fn apply_to_frame(&self, frame: &mut [u8], frame_width: usize) {
+        match self {
+            Self::Large(chunk_frame, offset) => {
+                let chunk_width = 8;
+                /* let top_left_starting_index = ((0 * chunk_width) + 0) * 4;
+                let top_right_starting_index = ((0 * chunk_width) + 7) * 4;
+                let bottom_left_starting_index = ((7 * chunk_width) + 0) * 4;
+                let bottom_right_starting_index = ((7 * chunk_width) + 7) * 4;
+
+                let top_left_frame_position = Vector2::new(0, 0) + *offset;
+                let top_right_frame_position = Vector2::new(7, 0) + *offset;
+                let bottom_left_frame_position = Vector2::new(0, 7) + *offset;
+                let bottom_right_frame_position = Vector2::new(7, 7) + *offset; */
+
+                Self::translate_chunk_frame_to_frame(
+                    frame,
+                    frame_width,
+                    chunk_frame,
+                    chunk_width,
+                    *offset,
+                );
+            }
+            _ => todo!(),
+        }
+    }
+
+    fn translate_chunk_frame_to_frame(
+        frame: &mut [u8],
+        frame_width: usize,
+        chunk_frame: &[u8; 256],
+        chunk_width: usize,
+        offset: Vector2<usize>,
+    ) {
+        for y in (0..8) {
+            for x in (0..8) {
+                let chunk_frame_starting_index = ((y * chunk_width) + x) * 4;
+                let rgba_slice =
+                    &chunk_frame[chunk_frame_starting_index..chunk_frame_starting_index + 4];
+
+                let frame_starting_index = (((y + offset.y) * frame_width) + (x + offset.x)) * 4;
+                let mut pixel = &mut frame[frame_starting_index..frame_starting_index + 4];
+                pixel.copy_from_slice(rgba_slice);
+            }
+        }
+    }
+
+    fn set_chunk_frame_pixel_to_color_by_starting_index(
+        chunk_frame: &mut [u8; 256],
+        starting_index: usize,
+        rgba: Rgba,
+    ) {
+        chunk_frame[starting_index] = rgba.r as u8;
+        chunk_frame[starting_index + 1] = rgba.g as u8;
+        chunk_frame[starting_index + 2] = rgba.b as u8;
+        chunk_frame[starting_index + 3] = rgba.a as u8;
     }
 
     // TODO: make this only enabled by a feature or something.
@@ -292,6 +406,24 @@ impl World {
     ) -> Vector3<f64> {
         let canvas_coords = Self::frame_to_canvas_coords(frame_coords, canvas);
         Self::canvas_to_viewport_coords(canvas_coords, canvas, viewport)
+    }
+
+    // TODO: choose a better name for this.
+    /// The same as trace_ray(), except it takes a world parameter.
+    /// The other function exists for when you do not have access to a shared mutable reference to a [`World`] you can pass in.
+    /// The original trace_ray() may be able to be factored out.
+    pub fn trace_ray_parameter_shortcut(&self, frame_position: Vector2<f64>) -> Rgba {
+        World::trace_ray(
+            self.camera.position,
+            self.camera,
+            World::frame_to_viewport_coords(frame_position, &self.canvas, &self.viewport),
+            self.background_color,
+            &self.spheres,
+            &self.lights,
+            1.0,
+            f64::MAX,
+            self.reflection_passes,
+        )
     }
 
     #[allow(clippy::too_many_arguments)]

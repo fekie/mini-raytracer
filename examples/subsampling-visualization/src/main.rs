@@ -2,6 +2,7 @@ use cgmath::Vector3;
 use mini_raytracer::components::{Camera, Light, Rgba, Sphere};
 use mini_raytracer::World;
 use pixels::{Error, Pixels, SurfaceTexture};
+use rayon::prelude::*;
 use std::io::{self, Write};
 use std::time::Instant;
 use winit::dpi::LogicalSize;
@@ -63,14 +64,16 @@ fn main() -> Result<(), Error> {
         background_color,
     );
 
-    let chunks = mini_raytracer::Chunk::from_frame_dimensions(WIDTH as usize, HEIGHT as usize);
-    /* dbg!(chunks.len());
-    panic!(); */
+    let mut chunks = mini_raytracer::Chunk::from_frame_dimensions(WIDTH as usize, HEIGHT as usize);
+    for chunk in chunks.iter_mut() {
+        chunk.render(&world);
+        chunk.apply_to_frame(pixels.get_frame(), WIDTH as usize);
+    }
 
     let mut frames = 0;
     let mut last_frame_update = Instant::now();
-    world.draw(pixels.get_frame());
-    mini_raytracer::Chunk::debug(&chunks, WIDTH as usize, pixels.get_frame());
+    //world.draw(pixels.get_frame());
+    //mini_raytracer::Chunk::debug(&chunks, WIDTH as usize, pixels.get_frame());
 
     event_loop.run(move |event, _, control_flow| {
         if let Event::RedrawRequested(_) = event {
