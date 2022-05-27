@@ -67,13 +67,13 @@ fn main() -> Result<(), Error> {
     let mut chunks = mini_raytracer::Chunk::from_frame_dimensions(WIDTH as usize, HEIGHT as usize);
     for chunk in chunks.iter_mut() {
         chunk.render(&world);
-        chunk.apply_to_frame(pixels.get_frame(), WIDTH as usize);
+        //chunk.apply_to_frame(pixels.get_frame(), WIDTH as usize);
     }
 
     let mut frames = 0;
     let mut last_frame_update = Instant::now();
     //world.draw(pixels.get_frame());
-    //mini_raytracer::Chunk::debug(&chunks, WIDTH as usize, pixels.get_frame());
+    mini_raytracer::Chunk::debug(&chunks, WIDTH as usize, pixels.get_frame());
 
     event_loop.run(move |event, _, control_flow| {
         if let Event::RedrawRequested(_) = event {

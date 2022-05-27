@@ -59,6 +59,18 @@ impl Rgba {
     pub fn multiply(&self, f: f64) -> Self {
         Rgba::new(self.r * f, self.g * f, self.b * f, self.a)
     }
+
+    /// Finds the difference of two [`Rgba`]s.
+    /// The result is normalized and will be a value between 0.0 and 1.0.
+    pub fn difference(&self, other: Self) -> f64 {
+        let denom = (255 * 3) as f64;
+        let mut raw_difference = 0.0;
+        raw_difference += (self.r - other.r).abs();
+        raw_difference += (self.g - other.g).abs();
+        raw_difference += (self.b - other.b).abs();
+        raw_difference += (self.a - other.a).abs();
+        raw_difference / denom
+    }
 }
 
 impl std::ops::Add for Rgba {
